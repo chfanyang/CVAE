@@ -1,9 +1,11 @@
 import argparse
 import os
+import sys
 import torch
 import torch.nn.functional as F
 import torch.multiprocessing
 import pandas as pd
+from tqdm import tqdm
 
 from utils import load_config, set_seed, get_device, ensure_dir, count_parameters
 from datasets import get_dataloaders
@@ -21,12 +23,14 @@ def loss_fn(recon_x, x, mu, logvar, beta, batch_size):
     return loss, recon_loss, kl_loss
 
 
-def train_epoch(model, loader, optimizer, device, beta):
+def train_epoch(model, loader, optimizer, device, beta, epoch, total_epochs):
     model.train()
     total_loss = 0.0
     total_recon = 0.0
     total_kl = 0.0
-    for x, _ in loader:
+    pbar = tqdm(loader, desc=f"Epoch {epoch}/{total_epochs} [Train]", leave=False,
+                file=sys.stdout, dynamic_ncols=True)
+    for x, _ in pbar:
         x = x.to(device)
         batch_size = x.size(0)
         optimizer.zero_grad()
@@ -37,17 +41,20 @@ def train_epoch(model, loader, optimizer, device, beta):
         total_loss += loss.item()
         total_recon += recon.item()
         total_kl += kl.item()
+        pbar.set_postfix(loss=loss.item(), recon=recon.item(), kl=kl.item())
     n = len(loader)
     return total_loss / n, total_recon / n, total_kl / n
 
 
 @torch.no_grad()
-def evaluate(model, loader, device, beta):
+def evaluate(model, loader, device, beta, desc="Eval"):
     model.eval()
     total_loss = 0.0
     total_recon = 0.0
     total_kl = 0.0
-    for x, _ in loader:
+    pbar = tqdm(loader, desc=desc, leave=False,
+                file=sys.stdout, dynamic_ncols=True)
+    for x, _ in pbar:
         x = x.to(device)
         batch_size = x.size(0)
         recon_x, mu, logvar = model(x)
@@ -85,10 +92,10 @@ def main():
 
     for epoch in range(1, epochs + 1):
         train_loss, train_recon, train_kl = train_epoch(
-            model, train_loader, optimizer, device, beta
+            model, train_loader, optimizer, device, beta, epoch, epochs
         )
         test_loss, test_recon, test_kl = evaluate(
-            model, test_loader, device, beta
+            model, test_loader, device, beta, desc=f"Epoch {epoch}/{epochs} [Test] "
         )
 
         print(

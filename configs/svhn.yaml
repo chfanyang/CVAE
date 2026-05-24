@@ -1,0 +1,13 @@
+dataset: svhn
+data_root: ./data
+output_dir: ./outputs/svhn
+checkpoint_path: ./checkpoints/svhn_best.pt
+last_checkpoint_path: ./checkpoints/svhn_last.pt
+batch_size: 512
+num_workers: 4
+epochs: 100
+learning_rate: 0.001
+z_dim: 64
+beta: 1.0
+seed: 42
+device: cuda

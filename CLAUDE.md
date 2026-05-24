@@ -1,0 +1,29 @@
+# CLAUDE.md
+
+Build a Linux-server-friendly PyTorch project for training a Convolutional VAE on SVHN and CIFAR10. Only implement the codebase for now. Do not run full experiments. Do not create notebooks.
+
+Create this project structure: README.md, requirements.txt, configs/svhn.yaml, configs/cifar10.yaml, src/datasets.py, src/model.py, src/train.py, src/evaluate.py, src/visualize.py, src/utils.py, scripts/train_svhn.sh, scripts/train_cifar10.sh, scripts/eval_svhn.sh, scripts/eval_cifar10.sh, data/, checkpoints/, outputs/svhn/, outputs/cifar10/, logs/.
+
+Use Python, PyTorch, torchvision, numpy, matplotlib, tqdm, pyyaml, and pandas. Put these packages in requirements.txt. Since the project will run on a Linux server, all plotting code must use matplotlib.use("Agg"), and the code must never call plt.show().
+
+Create configs/svhn.yaml with: dataset: svhn; data_root: ./data; output_dir: ./outputs/svhn; checkpoint_path: ./checkpoints/svhn_best.pt; last_checkpoint_path: ./checkpoints/svhn_last.pt; batch_size: 128; num_workers: 4; epochs: 50; learning_rate: 0.001; z_dim: 64; beta: 1.0; seed: 42; device: cuda.
+
+Create configs/cifar10.yaml with the same fields, but use dataset: cifar10, output_dir: ./outputs/cifar10, checkpoint_path: ./checkpoints/cifar10_best.pt, and last_checkpoint_path: ./checkpoints/cifar10_last.pt. If CUDA is unavailable, automatically fall back to CPU.
+
+In src/datasets.py, implement get_dataloaders(config). It should support torchvision.datasets.SVHN and torchvision.datasets.CIFAR10. Use transforms.ToTensor() only. SVHN should use split="train" and split="test". CIFAR10 should use train=True and train=False. Return train_loader and test_loader. Read data_root, batch_size, and num_workers from config. Use pin_memory=True when CUDA is available.
+
+In src/model.py, implement ConvVAE for RGB 32x32 images. Encoder: Conv2d(3,32,4,2,1), ReLU, Conv2d(32,64,4,2,1), ReLU, Conv2d(64,128,4,2,1), ReLU, Flatten, Linear(128*4*4,256), ReLU, Linear(256,z_dim) for mu, Linear(256,z_dim) for logvar. Reparameterization: std = torch.exp(0.5 * logvar), eps = torch.randn_like(std), z = mu + eps * std. Decoder: Linear(z_dim,256), ReLU, Linear(256,128*4*4), ReLU, reshape to 128x4x4, ConvTranspose2d(128,64,4,2,1), ReLU, ConvTranspose2d(64,32,4,2,1), ReLU, ConvTranspose2d(32,3,4,2,1), Sigmoid. Implement encode(x), reparameterize(mu, logvar), decode(z), and forward(x). forward(x) should return recon_x, mu, logvar.
+
+In src/utils.py, implement load_config(path), set_seed(seed), get_device(config), ensure_dir(path), save_json(obj, path), and count_parameters(model). load_config should read YAML. set_seed should set Python, NumPy, and PyTorch seeds. get_device should use CUDA only when requested and available. ensure_dir should create missing directories. save_json should save formatted JSON. count_parameters should count trainable parameters.
+
+In src/train.py, implement command-line training with: python src/train.py --config configs/svhn.yaml and python src/train.py --config configs/cifar10.yaml. Use Adam optimizer. Use this VAE loss: recon_loss = F.mse_loss(recon_x, x, reduction="sum") / batch_size; kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp()) / batch_size; loss = recon_loss + beta * kl_loss. Read beta from config. Each epoch should print train_total_loss, train_recon_loss, train_kl_loss, test_total_loss, test_recon_loss, and test_kl_loss. Evaluate on the test set after every epoch. Save the best model by lowest test_total_loss to checkpoint_path. Save the last model to last_checkpoint_path. Save loss history to outputs/{dataset}/loss.csv with columns: epoch, train_total_loss, train_recon_loss, train_kl_loss, test_total_loss, test_recon_loss, test_kl_loss. Save the loss curve to outputs/{dataset}/loss_curve.png.
+
+In src/visualize.py, implement save_image_grid(images, path, nrow=8, title=None), save_reconstruction_grid(model, dataloader, device, path, num_images=8), save_generation_grid(model, device, path, z_dim, num_images=64), save_interpolation_grid(model, device, path, z_dim, steps=10), and plot_loss_curve(loss_csv_path, output_path). All images are tensors in NCHW format with values in [0,1]. Reconstruction should save two rows: original images and reconstructed images. Generation should sample z from torch.randn(num_images, z_dim). Interpolation should sample two latent vectors and linearly interpolate between them. All outputs must be saved to files, with parent directories created automatically.
+
+In src/evaluate.py, implement command-line evaluation with: python src/evaluate.py --config configs/svhn.yaml and python src/evaluate.py --config configs/cifar10.yaml. Load the best checkpoint from checkpoint_path. Evaluate on the test set. Save metrics.json to outputs/{dataset}/metrics.json with test_total_loss, test_recon_loss, test_kl_loss, and test_mse. Also save outputs/{dataset}/reconstruction.png, outputs/{dataset}/generation.png, and outputs/{dataset}/interpolation.png.
+
+Create shell scripts. scripts/train_svhn.sh should run: mkdir -p logs; python src/train.py --config configs/svhn.yaml 2>&1 | tee logs/train_svhn.log. scripts/train_cifar10.sh should run the CIFAR10 config and save logs/train_cifar10.log. scripts/eval_svhn.sh should run python src/evaluate.py --config configs/svhn.yaml. scripts/eval_cifar10.sh should run python src/evaluate.py --config configs/cifar10.yaml. All scripts should start with #!/bin/bash and set -e.
+
+Write README.md explaining project purpose, dependency installation, how to train SVHN, how to train CIFAR10, how to evaluate both datasets, where outputs are saved, and how to select GPU using CUDA_VISIBLE_DEVICES=0.
+
+Important rules: do not use notebooks; do not call plt.show(); use matplotlib.use("Agg"); create missing directories automatically; make all commands runnable from the project root; do not run full 50-epoch training; after coding, list all created files.

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod +x *)",
+      "Bash(python -m py_compile src/utils.py)",
+      "Bash(python -m py_compile src/model.py)",
+      "Bash(python -m py_compile src/datasets.py)",
+      "Bash(python -m py_compile src/visualize.py)",
+      "Bash(python -m py_compile src/train.py)",
+      "Bash(python -m py_compile src/evaluate.py)"
+    ]
+  }
+}
